@@ -26,12 +26,10 @@ jobs:
 
       - name: Prepare Web Assets & Package Config
         run: |
-          # Create a package.json if it doesn't exist to satisfy npm/Capacitor setup
           if [ ! -f package.json ]; then
             npm init -y
           fi
           
-          # Create dist folder and move index.html into it for Capacitor web-dir
           mkdir -p dist
           if [ -f index.html ]; then
             cp index.html dist/index.html
@@ -46,7 +44,7 @@ jobs:
 
       - name: Initialize Capacitor Project
         run: |
-          npx cap init "flick demon" "com.flickdemon.app" --web-dir=dist --yes
+          npx cap init "flick demon" "com.flickdemon.app" --web-dir=dist
 
       - name: Add Android Platform
         run: |
