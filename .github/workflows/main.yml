@@ -1,4 +1,4 @@
-Name: Build APK
+name: Build Flick Demon APK
 
 on:
   push:
@@ -24,25 +24,35 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Install dependencies
-        run: npm install
+      - name: Prepare Web Assets & Package Config
+        run: |
+          # Create a package.json if it doesn't exist to satisfy npm/Capacitor setup
+          if [ ! -f package.json ]; then
+            npm init -y
+          fi
+          
+          # Create dist folder and move index.html into it for Capacitor web-dir
+          mkdir -p dist
+          if [ -f index.html ]; then
+            cp index.html dist/index.html
+          else
+            echo "Error: index.html not found in root directory!"
+            exit 1
+          fi
 
-      - name: Build web app
-        run: npm run build
+      - name: Install Capacitor & Dependencies
+        run: |
+          npm install @capacitor/core @capacitor/cli @capacitor/android
 
-      - name: Install Capacitor
-        run: npm install @capacitor/core @capacitor/cli @capacitor/android
+      - name: Initialize Capacitor Project
+        run: |
+          npx cap init "flick demon" "com.flickdemon.app" --web-dir=dist --yes
 
-      - name: Initialize Capacitor
-        run: npx cap init "flick demon" "com.flickdemon.app" --web-dir=dist
+      - name: Add Android Platform
+        run: |
+          npx cap add android
 
-      - name: Remove existing Android platform
-        run: rm -rf android
-
-      - name: Add Android platform
-        run: npx cap add android
-
-      - name: Fix Kotlin stdlib duplicate class conflict
+      - name: Apply Gradle Fixes for Kotlin Conflict
         run: |
           cat >> android/app/build.gradle << 'EOF'
 
@@ -51,18 +61,18 @@ jobs:
           }
           EOF
 
-      - name: Sync web assets into Android project
-        run: npx cap sync android
+      - name: Sync Web Assets into Android
+        run: |
+          npx cap sync android
 
-      - name: Build APK
+      - name: Build Debug APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Upload APK as artifact
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: FlickDemon-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
-          
