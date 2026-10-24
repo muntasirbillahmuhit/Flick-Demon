@@ -181,6 +181,8 @@ export default function App() {
   const [stPow, setStPow] = useState(1.0);
   const [stStyle, setStStyle] = useState('ball');
   const [stShadow, setStShadow] = useState<number>(0.35);
+  const [isDraggingShadow, setIsDraggingShadow] = useState(false);
+  const shadowAdjustTimerRef = useRef<any>(null);
 
   // Stats / LB state
   const [statsTab, setStatsTab] = useState<'overview' | 'mastery' | 'unlocks'>('overview');
@@ -404,10 +406,42 @@ export default function App() {
         B(-e, X(.5), '#a0a0a0', [h*.95, 2*s, 2*s, h*.95]);
         ring(X(.5), '#ffffff', 4);
         O(T, e, h*.85, h*.15, '#ffffff'); ln(e - tl*.3, 0, e, 0, '#333333', 3); break;
-      case 'transparent':
-        B(-e, T, 'rgba(255,255,255,0.3)', h*.85);
-        ln(-e + 10*s, 0, T - 5*s, 0, p[4] || '#3a5fc0', 4);
-        O(T, e, h*.8, h*.2, 'rgba(255,255,255,0.4)'); ln(e - tl*.3, 0, e, 0, p[4], 2.5); break;
+      case 'transparent': {
+        // Inner translucent ink reservoir tube
+        B(-e + 12*s, T - 10*s, 'rgba(255,255,255,0.22)', 2*s, h*0.5);
+        // Pressurized ink line with ink core
+        ln(-e + 16*s, 0, T - 14*s, 0, p[4] || '#3a5fc0', 4.5);
+        dot(T - 14*s, 2.2, p[4] || '#3a5fc0');
+        // Clear glass outer barrel with cylindrical gradient
+        c.beginPath();
+        c.roundRect(-e, -h*0.88, T - (-e), h*1.76, h*0.85);
+        const glassG = c.createLinearGradient(0, -h*0.88, 0, h*0.88);
+        glassG.addColorStop(0, 'rgba(255,255,255,0.58)');
+        glassG.addColorStop(0.2, 'rgba(255,255,255,0.12)');
+        glassG.addColorStop(0.5, 'rgba(255,255,255,0.03)');
+        glassG.addColorStop(0.8, 'rgba(255,255,255,0.16)');
+        glassG.addColorStop(1, 'rgba(255,255,255,0.45)');
+        c.fillStyle = glassG;
+        c.fill();
+        c.lineWidth = real ? 1.2*s : 2.5*s;
+        c.strokeStyle = real ? 'rgba(255,255,255,0.7)' : INK;
+        c.stroke();
+        // Top edge bright glass specular reflection highlight
+        ln(-e + 6*s, -h*0.65, T - 4*s, -h*0.65, 'rgba(255,255,255,0.85)', 1.8);
+        // Secondary soft glass sheen
+        ln(-e + 16*s, -h*0.35, T - 18*s, -h*0.35, 'rgba(255,255,255,0.35)', 1.1);
+        // Bottom edge glass rim reflection
+        ln(-e + 8*s, h*0.6, T - 6*s, h*0.6, 'rgba(255,255,255,0.4)', 1.1);
+        // Translucent glass cap/grip
+        B(-e, X(0.18), 'rgba(255,255,255,0.45)', [h*0.9, 2*s, 2*s, h*0.9], h*0.9);
+        ring(X(0.18), MET, 2.6);
+        clip(X(0.04), X(0.22), 'rgba(220,235,255,0.85)');
+        // Front glass nose cone with metallic tip & nib
+        O(T, e, h*0.85, h*0.18, 'rgba(255,255,255,0.45)');
+        ln(T + 2*s, -h*0.32, e - tl*0.4, -h*0.1, 'rgba(255,255,255,0.8)', 1.3);
+        ln(e - tl*0.35, 0, e, 0, p[4] || '#3a5fc0', 2.8);
+        break;
+      }
       default:
         B(-e, T, p[3], h*.85);
         ln(X(.28), 0, T + tl*.1, 0, p[4], 2.4);
@@ -886,20 +920,41 @@ export default function App() {
   const drawGame = (cx: CanvasRenderingContext2D, W: number, H: number, G: any) => {
     cx.clearRect(0, 0, W, H);
     cx.save(); if (G.shake > .3) cx.translate((Math.random() - .5)*G.shake, (Math.random() - .5)*G.shake);
-    const d = G.dk, w = d.r - d.l, h = d.b - d.t, cl = settings.desk === 'clean';
+    const d = G.dk, w = d.r - d.l, h = d.b - d.t, isGlass = settings.desk === 'glass', cl = settings.desk === 'clean';
     cx.save(); cx.shadowColor = 'rgba(0,0,0,.35)'; cx.shadowBlur = 22; cx.shadowOffsetY = 10;
     const bg = cx.createLinearGradient(0, d.t, 0, d.b);
-    bg.addColorStop(0, cl ? '#F1DEB8' : '#E4C28E'); bg.addColorStop(1, cl ? '#E0C591' : '#CDA36B');
+    if (isGlass) {
+      bg.addColorStop(0, '#B8D5E8');
+      bg.addColorStop(0.5, '#A0C2DA');
+      bg.addColorStop(1, '#8AB0CC');
+    } else {
+      bg.addColorStop(0, cl ? '#F1DEB8' : '#E4C28E');
+      bg.addColorStop(1, cl ? '#E0C591' : '#CDA36B');
+    }
     cx.fillStyle = bg; cx.beginPath(); cx.roundRect(d.l, d.t, w, h, 18); cx.fill(); cx.restore();
     cx.save(); cx.beginPath(); cx.roundRect(d.l, d.t, w, h, 18); cx.clip();
-    if (!cl) {
+    if (isGlass) {
+      const reflG = cx.createLinearGradient(d.l, d.t, d.r, d.b);
+      reflG.addColorStop(0, 'rgba(255,255,255,0.45)');
+      reflG.addColorStop(0.35, 'rgba(255,255,255,0.08)');
+      reflG.addColorStop(0.65, 'rgba(255,255,255,0)');
+      reflG.addColorStop(1, 'rgba(255,255,255,0.28)');
+      cx.fillStyle = reflG;
+      cx.fillRect(d.l, d.t, w, h);
+      cx.strokeStyle = 'rgba(255,255,255,0.7)';
+      cx.lineWidth = 2.5;
+      cx.beginPath();
+      cx.moveTo(d.l + 12, d.t + 12);
+      cx.lineTo(d.r - 12, d.t + 12);
+      cx.stroke();
+    } else if (!cl) {
       cx.lineCap = 'round';
       for (const g of G.gr) {
         const y = d.t + g[0]*h; cx.strokeStyle = g[1] > .5 ? 'rgba(120,80,40,.2)' : 'rgba(255,240,210,.22)'; cx.lineWidth = 1 + g[1]*1.6;
         cx.beginPath(); cx.moveTo(d.l + g[1]*w, y); cx.quadraticCurveTo(d.l + (g[1] + .18)*w, y - 4, d.l + (g[1] + .4)*w, y + 3); cx.stroke();
       }
     }
-    cx.strokeStyle = 'rgba(255,255,255,.35)'; cx.lineWidth = 3; cx.beginPath(); cx.roundRect(d.l + 3, d.t + 3, w - 6, h - 6, 15); cx.stroke();
+    cx.strokeStyle = isGlass ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,.35)'; cx.lineWidth = 3; cx.beginPath(); cx.roundRect(d.l + 3, d.t + 3, w - 6, h - 6, 15); cx.stroke();
     cx.restore();
     cx.lineWidth = 4; cx.strokeStyle = '#2C2223'; cx.beginPath(); cx.roundRect(d.l, d.t, w, h, 18); cx.stroke();
 
@@ -1556,7 +1611,19 @@ export default function App() {
         </div>
         <div className="card" style={{marginBottom:'10px'}}>
           <div className="stage" style={{margin:'0 0 10px'}}>
-            <canvas ref={studioCanvasRef} width={640} height={300} style={{display:'block',width:'100%',height:'150px'}}></canvas>
+            <canvas
+              ref={studioCanvasRef}
+              width={640}
+              height={300}
+              className={`studio-preview-canvas ${isDraggingShadow ? 'shadow-adjusting' : ''}`}
+              style={{
+                display: 'block',
+                width: '100%',
+                height: '150px',
+                '--sh-base': `0 ${1 + stShadow * 2.5}px ${2 + stShadow * 4}px rgba(0,0,0,${Math.min(0.3, stShadow * 0.25)})`,
+                '--sh-pulse': `0 ${2 + stShadow * 4}px ${4 + stShadow * 7}px rgba(0,0,0,${Math.min(0.45, stShadow * 0.36 + 0.08)})`
+              } as React.CSSProperties}
+            ></canvas>
           </div>
           <div className="pill" style={{marginBottom:'10px'}}>
             <span>🏷️</span><input value={stName} onChange={e => setStName(e.target.value)} placeholder="Custom Pen Name" maxLength={16} />
@@ -1586,16 +1653,47 @@ export default function App() {
           <div className="studio-row"><span>Weight (Mass)</span><input type="range" min={0.7} max={1.7} step={0.1} value={stMass} onChange={e => setStMass(+e.target.value)} /></div>
           <div className="studio-row"><span>Flick Power</span><input type="range" min={0.8} max={1.3} step={0.05} value={stPow} onChange={e => setStPow(+e.target.value)} /></div>
           <div className="studio-row">
-            <span>Pen Shadow ({Math.round(stShadow * 100)}%)</span>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={stShadow}
-              onChange={e => setStShadow(+e.target.value)}
-              aria-label="Pen Shadow Strength"
-            />
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              Pen Shadow
+              <span className="shadow-val-pill">{Math.round(stShadow * 100)}%</span>
+            </span>
+            <div className="shadow-slider-container">
+              <div
+                className={`shadow-slider-tooltip ${isDraggingShadow ? 'active' : ''}`}
+                style={{ left: `calc(${stShadow * 100}% + ${(0.5 - stShadow) * 18}px)` }}
+                aria-hidden="true"
+              >
+                {Math.round(stShadow * 100)}%
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={stShadow}
+                onPointerDown={() => {
+                  if (shadowAdjustTimerRef.current) clearTimeout(shadowAdjustTimerRef.current);
+                  setIsDraggingShadow(true);
+                }}
+                onPointerUp={() => {
+                  if (shadowAdjustTimerRef.current) clearTimeout(shadowAdjustTimerRef.current);
+                  shadowAdjustTimerRef.current = setTimeout(() => setIsDraggingShadow(false), 250);
+                }}
+                onPointerCancel={() => setIsDraggingShadow(false)}
+                onFocus={() => setIsDraggingShadow(true)}
+                onBlur={() => {
+                  if (shadowAdjustTimerRef.current) clearTimeout(shadowAdjustTimerRef.current);
+                  setIsDraggingShadow(false);
+                }}
+                onChange={e => {
+                  setStShadow(+e.target.value);
+                  setIsDraggingShadow(true);
+                  if (shadowAdjustTimerRef.current) clearTimeout(shadowAdjustTimerRef.current);
+                  shadowAdjustTimerRef.current = setTimeout(() => setIsDraggingShadow(false), 600);
+                }}
+                aria-label="Pen Shadow Strength"
+              />
+            </div>
           </div>
         </div>
         <button className="btn btn-primary big" onClick={() => {
@@ -1708,7 +1806,7 @@ export default function App() {
                 <div style={{marginBottom:'6px'}}><small style={{color:'var(--sub)'}}>Color Theme</small></div>
                 {seg('theme', [['system','System'],['light','Light'],['dark','Dark']])}
                 <div style={{margin:'10px 0 6px'}}><small style={{color:'var(--sub)'}}>Desk Surface</small></div>
-                {seg('desk', [['clean','Clean Wood'],['old','Classic Desk']])}
+                {seg('desk', [['clean','Clean Wood'],['old','Classic Desk'],['glass','Frosted Glass']])}
               </div>
 
               <div className="sec-title">🎮 Gameplay & Assist</div>
