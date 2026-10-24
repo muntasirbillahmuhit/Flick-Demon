@@ -1,0 +1,5 @@
+{
+  "name": "Flick Demon · School Desk Battles",
+  "description": "School desk pen flicking battle game with custom pen studio, physics, CPU opponents, and local ranks.",
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
